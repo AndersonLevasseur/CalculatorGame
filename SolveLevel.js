@@ -2,9 +2,6 @@
 const Key = require("./Key.js");
 
 module.exports = class SolveLevel {
-    /*fill out*/
-    /* If it's adding a number just put the number directly, otherwise make it a string*/
-    /* If +/- is a key replace it with *-1 */
     constructor(userKeyArr, startingNum, numberOfMoves, targetNum) {
         this.userKeyArr = userKeyArr;
         this.startingNum = startingNum;
@@ -12,82 +9,96 @@ module.exports = class SolveLevel {
         this.numberOfMoves = numberOfMoves;
         this.done = false;
         this.first = 0;
-        this.solution = [];
         this.keyArr = [];
     }
 
-    solve(keyArr, startingNum, numberOfMoves, lastKeyNum) {
-        //   converts userKeyArr to an array with Key objects
+    //   converts userKeyArr to an array with Key objects
+    solve() {
         this.userKeyArr.forEach(element => {
             this.convertToKey(element);
         });
-        if (this.done) {
-            return
+
+        const solution = this.solved(this.numberOfMoves, this.targetNum, this.startingNum, [])
+
+        if (solution[solution.length - 1] === "done") {
+            return solution.slice(0, solution.length - 1);
         }
-        if (startingNum === this.targetNum) {
-            this.done = true;
-        } else if (numberOfMoves === 0 || this.done) {
-            return this.solution;
-        } else {
-            for (let i = 0; i < keyArr.length; i++) {
-                startingNum = this.identify(this.keyArr[i], startingNum);
-                this.solve(keyArr, startingNum, numberOfMoves - 1, i);
-                if (this.done) {
-                    if (this.keyArr[i] === "reverse") {
-                        this.solution.unshift("reverse");
-                    } else if (this.keyArr[i].add === true) {
-                        this.solution.unshift(`+${this.keyArr[i].value}`);
-                    } else if (this.keyArr[i].subtract === true) {
-                        this.solution.unshift(`-${this.keyArr[i].value}`);
-                    } else if (this.keyArr[i].multiply === true) {
-                        this.solution.unshift(`*${this.keyArr[i].value}`);
-                    } else if (this.keyArr[i].divide === true) {
-                        this.solution.unshift(`/${this.keyArr[i].value}`);
-                    } else if (this.keyArr[i].addDigit === true) {
-                        this.solution.unshift(this.keyArr[i].value);
-                    }
-                    return this.solution;
-                }
+        return ["no solution"];
+
+    }
+
+    //solves the puzzle recursively
+    solved(turnNum, tarNum, currNum, ans) {
+        if (tarNum === currNum) {
+            ans.push("done");
+            return ans;
+        }
+
+        if (turnNum < 1) {
+            return ans.slice(0, ans.length - 1);
+        }
+
+        for (const key of this.keyArr) {
+            switch (key.mode) {
+                case "rev":
+                    ans.push("Reverse");
+                    ans = this.solved(turnNum - 1, tarNum, this.reverse(currNum), ans);
+                    break;
+                case "+":
+                    ans.push(`+${key.value}`);
+                    ans = this.solved(turnNum - 1, tarNum, currNum + key.value, ans);
+                    break;
+                case "-":
+                    ans.push(`-${key.value}`);
+                    ans = this.solved(turnNum - 1, tarNum, currNum - key.value, ans);
+                    break;
+                case "*":
+                    ans.push(`*${key.value}`);
+                    ans = this.solved(turnNum - 1, tarNum, currNum * key.value, ans);
+                    break;
+                case "/":
+                    ans.push(`/${key.value}`);
+                    ans = this.solved(turnNum - 1, tarNum, currNum / key.value, ans);
+                    break;
+                case "addDig":
+                    ans.push(`Add Digit ${key.value}`);
+                    let numTens = 1;
+                    if (key.value > 0) { numTens = Math.floor(1 + Math.log10(key.value)); }
+                    ans = this.solved(turnNum - 1, tarNum, (currNum * Math.pow(10, numTens)) + key.value, ans);
+                    break;
+                case "del":
+                    ans.push(`Delete Digit`);
+                    ans = this.solved(turnNum - 1, tarNum, parseInt(currNum / 10), ans);
+                    break;
+                default:
+                    throw "Could not find key";
+            }
+
+            if (ans[ans.length - 1] === "done") {
+                return ans;
             }
         }
-        if (this.done === false) {
-            return "no solution"
-        }
-    };
+        return ans.slice(0, ans.length - 1);
 
-    identify(key, startingNum) {
-        if (key === "reverse") {
-            this.reverse(startingNum);
-            return startingNum;
-        } else if (key.add === true) {
-            startingNum += key.value;
-            return startingNum;
-        } else if (key.subtract === true) {
-            startingNum -= key.value;
-            return startingNum;
-        } else if (key.multiply === true) {
-            startingNum *= key.value;
-            return startingNum;
-        } else if (key.divide === true) {
-            startingNum /= key.value;
-            return startingNum;
-        } else if (key.addDigit === true) {
-            startingNum = (startingNum * 10) + key.value;
-            return startingNum;
-        }
     };
 
     reverse(num) {
-        numString = num.toString();
-        let reversedNum
+        let numString = num.toString();
+        let neg = false;
+        let reversedNum = "";
 
         if (numString.slice(0, 1) === "-") {
-
+            neg = true;
+            numString = numString.slice(1);
         }
 
         while (numString.length !== 0) {
             reversedNum += numString.slice(numString.length - 1);
             numString = numString.slice(0, numString.length - 1);
+        }
+        reversedNum = parseInt(reversedNum);
+        if (neg) {
+            reversedNum *= -1;
         }
         return reversedNum;
     };
@@ -99,48 +110,46 @@ module.exports = class SolveLevel {
             let keyNum;
             if (typeof keyAsString === "string") {
                 if (keyAsString.slice(0, 1) === "R" || keyAsString.slice(0, 1) === "r") {
-                    key = new Key(null);
-                    key.reverse = true;
+                    key = new Key(null, "rev");
                     this.keyArr.push(key);
                 } else if (keyAsString.slice(0, 1) === "+") {
                     keyNum = keyAsString.replace(" ", "");
-                    keyNum = keyNum.slice(keyAsString.length - 1);
+                    keyNum = keyNum.slice(1, keyAsString.length);
                     keyNum = Number(keyNum);
-                    key = new Key(keyNum);
-                    key.add = true;
+                    key = new Key(keyNum, "+");
                     this.keyArr.push(key);
                 } else if (keyAsString.slice(0, 1) === "-") {
                     keyNum = keyAsString.replace(" ", "");
-                    keyNum = keyNum.slice(keyAsString.length - 1);
+                    keyNum = keyNum.slice(1, keyAsString.length);
                     keyNum = Number(keyNum);
-                    key = new Key(keyNum);
-                    key.subtract = true;
+                    key = new Key(keyNum, "-");
                     this.keyArr.push(key);
                 } else if (keyAsString.slice(0, 1) === "*") {
                     keyNum = keyAsString.replace(" ", "");
-                    keyNum = keyNum.slice(keyAsString.length - 1);
+                    keyNum = keyNum.slice(1, keyAsString.length);
                     keyNum = Number(keyNum);
-                    key = new Key(keyNum);
-                    key.multiply = true;
+                    key = new Key(keyNum, "*");
                     this.keyArr.push(key);
                 } else if (keyAsString.slice(0, 1) === "/") {
                     keyNum = keyAsString.replace(" ", "");
-                    keyNum = keyNum.slice(keyAsString.length - 1);
+                    keyNum = keyNum.slice(1, keyAsString.length);
                     keyNum = Number(keyNum);
-                    key = new Key(keyNum);
-                    key.divide = true;
+                    key = new Key(keyNum, "/");
                     this.keyArr.push(key);
-                } else if (typeof keyAsString.replace(" ", "") === "number") {
+                } else if (keyAsString === "del") {
+                    keyNum = 0;
+                    key = new Key(keyNum, "del");
+                    this.keyArr.push(key);
+                } else if (Number(keyAsString.replace(" ", "")) != NaN) {
                     keyAsString = keyAsString.replace(" ", "");
-                    key = new Key(keyNum);
-                    key.addDigit = true;
+                    keyNum = Number(keyAsString);
+                    key = new Key(keyNum, "addDig");
                     this.keyArr.push(key);
                 } else {
                     throw "Error : Can't Identify Key passed"
                 }
             } else if (typeof keyAsString === "number") {
-                key = new Key(keyNum);
-                key.addDigit = true;
+                key = new Key(keyNum, "addDig");
                 this.keyArr.push(key);
             } else {
                 throw "Error : Can't Identify Key passed"
